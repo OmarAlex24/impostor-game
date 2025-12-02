@@ -819,14 +819,43 @@ export const wordCategories: Record<string, string[]> = {
     "Físico",
     "Astrónomo",
   ],
-}
+};
 
 export function getRandomWord(category: string): string {
-  const words = wordCategories[category]
-  if (!words) return "Palabra"
-  return words[Math.floor(Math.random() * words.length)]
+  const words = wordCategories[category];
+  if (!words) return "Palabra";
+  return words[Math.floor(Math.random() * words.length)];
+}
+
+/**
+ * Get a random word with decreased probability for used words.
+ * Used words have 20% probability, unused words have 100% probability.
+ * Implementation: Create weighted array where unused words appear 5x more.
+ */
+export function getRandomWordWeighted(category: string, usedWords: string[] = []): string {
+  const words = wordCategories[category];
+  if (!words) return "Palabra";
+
+  const usedWordsSet = new Set(usedWords);
+
+  // Create weighted array
+  const weightedWords: string[] = [];
+  for (const word of words) {
+    if (usedWordsSet.has(word)) {
+      // Used word: add once (20% relative weight)
+      weightedWords.push(word);
+    } else {
+      // Unused word: add 5 times (100% relative weight)
+      for (let i = 0; i < 5; i++) {
+        weightedWords.push(word);
+      }
+    }
+  }
+
+  // If all words have been used, weightedWords will still have all words (just once each)
+  return weightedWords[Math.floor(Math.random() * weightedWords.length)];
 }
 
 export function getCategories(): string[] {
-  return Object.keys(wordCategories)
+  return Object.keys(wordCategories);
 }

@@ -6,7 +6,8 @@ import type { Doc } from "@/convex/_generated/dataModel"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlayerList } from "@/components/player-list"
-import { Trophy, Skull, RotateCcw, Home } from "lucide-react"
+import { Scoreboard } from "@/components/scoreboard"
+import { Trophy, Skull, RotateCcw, Home, RefreshCw } from "lucide-react"
 import Link from "next/link"
 
 interface GameResultsProps {
@@ -20,11 +21,14 @@ export function GameResults({ room, players, currentPlayer, sessionId }: GameRes
   const resetRoom = useMutation(api.rooms.resetRoom)
   const isHost = currentPlayer.isHost
 
+  // Filter active players (who participated in voting)
+  const activePlayers = players.filter((p) => !p.isEliminated || p.votedFor)
+
   // Calcular resultados
   const impostor = players.find((p) => p.sessionId === room.impostorId)
   const votes: Record<string, number> = {}
 
-  players.forEach((p) => {
+  activePlayers.forEach((p) => {
     if (p.votedFor) {
       votes[p.votedFor] = (votes[p.votedFor] || 0) + 1
     }
@@ -45,7 +49,15 @@ export function GameResults({ room, players, currentPlayer, sessionId }: GameRes
 
   const handlePlayAgain = async () => {
     try {
-      await resetRoom({ roomId: room._id, sessionId })
+      await resetRoom({ roomId: room._id, sessionId, resetStats: false })
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleResetAndPlay = async () => {
+    try {
+      await resetRoom({ roomId: room._id, sessionId, resetStats: true })
     } catch (err) {
       console.error(err)
     }
@@ -127,7 +139,7 @@ export function GameResults({ room, players, currentPlayer, sessionId }: GameRes
           </CardHeader>
           <CardContent>
             <PlayerList
-              players={players}
+              players={activePlayers}
               currentSessionId={sessionId}
               showVotes
               impostorId={room.impostorId}
@@ -136,25 +148,38 @@ export function GameResults({ room, players, currentPlayer, sessionId }: GameRes
           </CardContent>
         </Card>
 
+        {/* Scoreboard */}
+        <Scoreboard roomId={room._id} currentSessionId={sessionId} />
+
         {/* Acciones */}
-        <div className="flex gap-4">
-          <Link href="/" className="flex-1">
-            <Button variant="outline" className="w-full bg-transparent" size="lg">
+        <div className="space-y-3">
+          {isHost && (
+            <>
+              <Button
+                onClick={handlePlayAgain}
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                size="lg"
+              >
+                <RotateCcw className="h-5 w-5 mr-2" />
+                Jugar de nuevo (mantener puntos)
+              </Button>
+              <Button
+                onClick={handleResetAndPlay}
+                variant="outline"
+                className="w-full"
+                size="lg"
+              >
+                <RefreshCw className="h-5 w-5 mr-2" />
+                Reiniciar todo (borrar puntos)
+              </Button>
+            </>
+          )}
+          <Link href="/" className="block">
+            <Button variant="ghost" className="w-full" size="lg">
               <Home className="h-5 w-5 mr-2" />
-              Salir
+              Salir de la sala
             </Button>
           </Link>
-
-          {isHost && (
-            <Button
-              onClick={handlePlayAgain}
-              className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-              size="lg"
-            >
-              <RotateCcw className="h-5 w-5 mr-2" />
-              Jugar de nuevo
-            </Button>
-          )}
         </div>
       </div>
     </main>

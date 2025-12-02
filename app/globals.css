@@ -153,3 +153,76 @@
 .impostor-reveal {
   animation: impostor-pulse 2s ease-in-out infinite;
 }
+
+/* Turn animations */
+@keyframes turn-spotlight {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 20px 10px rgba(34, 197, 94, 0.4);
+  }
+}
+
+@keyframes turn-scale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes turn-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.turn-active {
+  animation: turn-spotlight 2s ease-in-out infinite, turn-scale 2s ease-in-out infinite;
+}
+
+.turn-banner {
+  animation: turn-slide-in 0.3s ease-out;
+}
+
+/* Spectator styles */
+.spectator-overlay {
+  position: relative;
+}
+
+.spectator-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Points animation */
+@keyframes points-pop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.points-award {
+  animation: points-pop 0.5s ease-out;
+}

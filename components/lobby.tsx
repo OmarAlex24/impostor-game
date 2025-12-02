@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
-import type { Doc } from "@/convex/_generated/dataModel"
+import type { Doc, Id } from "@/convex/_generated/dataModel"
 import { wordCategories } from "@/convex/words"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +11,16 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PlayerList } from "@/components/player-list"
 import { ShareRoom } from "@/components/share-room"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Check, Crown, Loader2, Play, Clock } from "lucide-react"
 
 interface LobbyProps {
@@ -25,13 +35,34 @@ export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
   const [discussionMinutes, setDiscussionMinutes] = useState<number>(2)
   const [isStarting, setIsStarting] = useState(false)
   const [error, setError] = useState("")
+  // Kick dialog state
+  const [kickTarget, setKickTarget] = useState<{ id: Id<"players">; name: string } | null>(null)
+  const [isKicking, setIsKicking] = useState(false)
 
   const toggleReady = useMutation(api.players.toggleReady)
   const startGame = useMutation(api.rooms.startGame)
+  const kickPlayer = useMutation(api.players.kick)
 
   const isHost = currentPlayer.isHost
   const allReady = players.every((p) => p.isReady || p.isHost)
   const canStart = players.length >= 3 && allReady
+
+  const handleKickRequest = (playerId: Id<"players">, playerName: string) => {
+    setKickTarget({ id: playerId, name: playerName })
+  }
+
+  const handleKickConfirm = async () => {
+    if (!kickTarget) return
+    setIsKicking(true)
+    try {
+      await kickPlayer({ playerId: kickTarget.id, kickerSessionId: sessionId })
+    } catch (err: any) {
+      console.error(err)
+    } finally {
+      setIsKicking(false)
+      setKickTarget(null)
+    }
+  }
 
   const handleToggleReady = async () => {
     try {
@@ -82,7 +113,13 @@ export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <PlayerList players={players} currentSessionId={sessionId} showReady />
+            <PlayerList
+              players={players}
+              currentSessionId={sessionId}
+              showReady
+              canKick={isHost}
+              onKick={handleKickRequest}
+            />
           </CardContent>
         </Card>
 
@@ -181,6 +218,28 @@ export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
           </Button>
         )}
       </div>
+
+      {/* Kick confirmation dialog */}
+      <AlertDialog open={!!kickTarget} onOpenChange={(open) => !open && setKickTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Expulsar a {kickTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará al jugador de la sala. Tendrá que unirse de nuevo con el código de la sala.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isKicking}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleKickConfirm}
+              disabled={isKicking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isKicking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Expulsar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   )
 }

@@ -86,3 +86,66 @@ export const leave = mutation({
     await ctx.db.delete(args.playerId)
   },
 })
+
+// Get leaderboard sorted by points
+export const getLeaderboard = query({
+  args: { roomId: v.id("rooms") },
+  handler: async (ctx, args) => {
+    const players = await ctx.db
+      .query("players")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .collect()
+
+    // Sort by points descending
+    const sorted = [...players].sort((a, b) => (b.points || 0) - (a.points || 0))
+
+    // Calculate rankings
+    const mvp = sorted[0] || null
+    const bestDetective = [...players].sort((a, b) => (b.correctVotes || 0) - (a.correctVotes || 0))[0] || null
+    const bestLiar = [...players].sort((a, b) => (b.impostorWins || 0) - (a.impostorWins || 0))[0] || null
+
+    return {
+      leaderboard: sorted,
+      mvp,
+      bestDetective,
+      bestLiar,
+    }
+  },
+})
+
+// Host can kick a player from the room
+export const kick = mutation({
+  args: {
+    playerId: v.id("players"),
+    kickerSessionId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const player = await ctx.db.get(args.playerId)
+    if (!player) throw new Error("Jugador no encontrado")
+
+    // Get the room to verify kicker is host
+    const room = await ctx.db.get(player.roomId)
+    if (!room) throw new Error("Sala no encontrada")
+
+    // Verify kicker is the host
+    if (room.hostId !== args.kickerSessionId) {
+      throw new Error("Solo el host puede expulsar jugadores")
+    }
+
+    // Cannot kick yourself
+    if (player.sessionId === args.kickerSessionId) {
+      throw new Error("No puedes expulsarte a ti mismo")
+    }
+
+    // Cannot kick during active game (only in lobby)
+    if (room.status !== "waiting") {
+      throw new Error("Solo puedes expulsar jugadores en el lobby")
+    }
+
+    // Delete the player
+    await ctx.db.delete(args.playerId)
+
+    // Update room's last activity
+    await ctx.db.patch(room._id, { lastActivityAt: Date.now() })
+  },
+})

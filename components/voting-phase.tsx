@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CountdownTimer } from "@/components/countdown-timer"
 import { PlayerList } from "@/components/player-list"
-import { Vote, Check, Crown } from "lucide-react"
+import { SpectatorChat } from "@/components/spectator-chat"
+import { Vote, Check, Crown, Loader2, Ghost } from "lucide-react"
 
 interface VotingPhaseProps {
   room: Doc<"rooms">
@@ -20,12 +21,16 @@ interface VotingPhaseProps {
 export function VotingPhase({ room, players, currentPlayer, sessionId }: VotingPhaseProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(currentPlayer.votedFor || null)
   const [hasVoted, setHasVoted] = useState(!!currentPlayer.votedFor)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const vote = useMutation(api.players.vote)
-  const showResults = useMutation(api.rooms.showResults)
+  const processVotingResults = useMutation(api.rooms.processVotingResults)
 
   const isHost = currentPlayer.isHost
-  const allVoted = players.every((p) => p.votedFor)
+  const isEliminated = currentPlayer.isEliminated
+  const activePlayers = players.filter((p) => !p.isEliminated)
+  const spectators = players.filter((p) => p.isEliminated)
+  const allVoted = activePlayers.every((p) => p.votedFor)
 
   // Actualizar estado si ya votó
   useEffect(() => {
@@ -49,17 +54,79 @@ export function VotingPhase({ room, players, currentPlayer, sessionId }: VotingP
     }
   }
 
-  const handleShowResults = async () => {
+  const handleProcessResults = async () => {
+    setIsProcessing(true)
     try {
-      await showResults({ roomId: room._id })
+      await processVotingResults({ roomId: room._id, sessionId })
     } catch (err) {
       console.error(err)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
-  // Filtrar jugadores votables (no puedes votarte a ti mismo)
-  const votablePlayers = players.filter((p) => p.sessionId !== sessionId)
+  // Filtrar jugadores votables (no puedes votarte a ti mismo, solo activos)
+  const votablePlayers = activePlayers.filter((p) => p.sessionId !== sessionId)
 
+  // Spectator view
+  if (isEliminated) {
+    return (
+      <main className="min-h-screen flex flex-col p-4">
+        <div className="w-full max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Main voting view (spectator) */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* Spectator banner */}
+              <Card className="bg-muted/50 border-dashed border-2">
+                <CardContent className="py-4">
+                  <div className="flex items-center gap-3">
+                    <Ghost className="w-8 h-8 text-muted-foreground" />
+                    <div>
+                      <p className="font-bold">Eres espectador</p>
+                      <p className="text-sm text-muted-foreground">
+                        Observa la votación y chatea con otros espectadores.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <Vote className="w-6 h-6 text-destructive" />
+                    Votación
+                  </h1>
+                  <p className="text-muted-foreground text-sm">Los jugadores están votando...</p>
+                </div>
+                {room.votingEndTime && <CountdownTimer endTime={room.votingEndTime} onComplete={() => {}} />}
+              </div>
+
+              {/* Voting progress */}
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">
+                    Votos: {activePlayers.filter((p) => p.votedFor).length} / {activePlayers.length}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PlayerList players={activePlayers} currentSessionId={sessionId} showVotes />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Spectator chat */}
+            <div className="h-[400px] lg:h-auto">
+              <SpectatorChat roomId={room._id} sessionId={sessionId} isSpectator={isEliminated} />
+            </div>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  // Active player view
   return (
     <main className="min-h-screen flex flex-col p-4">
       <div className="w-full max-w-2xl mx-auto space-y-6">
@@ -136,18 +203,47 @@ export function VotingPhase({ room, players, currentPlayer, sessionId }: VotingP
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg">
-              Votos: {players.filter((p) => p.votedFor).length} / {players.length}
+              Votos: {activePlayers.filter((p) => p.votedFor).length} / {activePlayers.length}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <PlayerList players={players} currentSessionId={sessionId} showVotes />
+            <PlayerList players={activePlayers} currentSessionId={sessionId} showVotes />
+            {spectators.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                  <Ghost className="w-4 h-4" />
+                  Espectadores ({spectators.length})
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {spectators.map((p) => (
+                    <span key={p._id} className="px-2 py-1 rounded-full text-xs bg-muted opacity-60">
+                      {p.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Botón para mostrar resultados (solo host) */}
+        {/* Botón para procesar resultados (solo host) */}
         {isHost && (
-          <Button onClick={handleShowResults} disabled={!allVoted} className="w-full" size="lg">
-            {allVoted ? "Revelar Resultados" : "Esperando todos los votos..."}
+          <Button
+            onClick={handleProcessResults}
+            disabled={!allVoted || isProcessing}
+            className="w-full"
+            size="lg"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Procesando...
+              </>
+            ) : allVoted ? (
+              "Revelar Resultados"
+            ) : (
+              "Esperando todos los votos..."
+            )}
           </Button>
         )}
       </div>
