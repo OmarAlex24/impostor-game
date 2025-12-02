@@ -12,8 +12,8 @@ async function cleanupInactiveRooms(ctx: MutationCtx) {
   const rooms = await ctx.db.query("rooms").collect()
 
   for (const room of rooms) {
-    // Delete rooms that haven't had activity in 10+ minutes
-    if (room.lastActivityAt < cutoffTime) {
+    // Delete rooms that haven't had activity in 10+ minutes (or have no lastActivityAt)
+    if (!room.lastActivityAt || room.lastActivityAt < cutoffTime) {
       // Delete all players in the room first
       const players = await ctx.db
         .query("players")

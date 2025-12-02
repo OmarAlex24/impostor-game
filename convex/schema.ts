@@ -12,7 +12,7 @@ export default defineSchema({
     discussionEndTime: v.optional(v.number()),
     votingEndTime: v.optional(v.number()),
     // Inactive room cleanup
-    lastActivityAt: v.number(),
+    lastActivityAt: v.optional(v.number()),
     // Turn system
     turnOrder: v.optional(v.array(v.string())),
     currentTurnIndex: v.optional(v.number()),
