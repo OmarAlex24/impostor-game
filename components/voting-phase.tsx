@@ -111,7 +111,7 @@ export function VotingPhase({ room, players, currentPlayer, sessionId }: VotingP
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <PlayerList players={activePlayers} currentSessionId={sessionId} showVotes />
+                  <PlayerList players={activePlayers} currentSessionId={sessionId} showVotes showHasVoted />
                 </CardContent>
               </Card>
             </div>
@@ -207,7 +207,7 @@ export function VotingPhase({ room, players, currentPlayer, sessionId }: VotingP
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <PlayerList players={activePlayers} currentSessionId={sessionId} showVotes />
+            <PlayerList players={activePlayers} currentSessionId={sessionId} showVotes showHasVoted />
             {spectators.length > 0 && (
               <div className="mt-4 pt-4 border-t border-border">
                 <p className="text-sm text-muted-foreground mb-2 flex items-center gap-2">

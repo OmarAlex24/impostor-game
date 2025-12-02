@@ -10,6 +10,7 @@ interface PlayerListProps {
   currentSessionId: string
   showReady?: boolean
   showVotes?: boolean
+  showHasVoted?: boolean
   votingFor?: string | null
   onVote?: (sessionId: string) => void
   impostorId?: string
@@ -27,6 +28,7 @@ export function PlayerList({
   currentSessionId,
   showReady = false,
   showVotes = false,
+  showHasVoted = false,
   votingFor,
   onVote,
   impostorId,
@@ -127,6 +129,13 @@ export function PlayerList({
                   ) : (
                     "Esperando..."
                   )}
+                </div>
+              )}
+
+              {showHasVoted && player.votedFor && (
+                <div className="flex items-center gap-1 px-2 py-1 rounded bg-primary/20 text-primary text-sm font-medium">
+                  <Check className="w-3 h-3" />
+                  Votó
                 </div>
               )}
 
