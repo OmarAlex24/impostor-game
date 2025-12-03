@@ -158,7 +158,7 @@ export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.keys(wordCategories).map((cat) => (
+                      {Object.keys(wordCategories).filter(cat => cat).map((cat) => (
                         <SelectItem key={cat} value={cat}>
                           {cat}
                         </SelectItem>

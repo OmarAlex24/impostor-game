@@ -40,7 +40,7 @@ export function RoleActions({ room, currentPlayer, players, sessionId }: RoleAct
   if (!role || role === "none") return null
 
   const roleInfo = ROLE_DESCRIPTIONS[role]
-  const activePlayers = players.filter((p) => !p.isEliminated && p.sessionId !== sessionId)
+  const activePlayers = players.filter((p) => !p.isEliminated && p.sessionId !== sessionId && p.sessionId)
 
   const handleDetectiveInvestigate = async () => {
     if (!selectedTarget || hasUsedAbility) return
