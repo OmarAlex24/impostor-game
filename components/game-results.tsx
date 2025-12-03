@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlayerList } from "@/components/player-list"
 import { Scoreboard } from "@/components/scoreboard"
-import { Trophy, Skull, RotateCcw, Home, RefreshCw } from "lucide-react"
+import { GAME_MODES, ROLE_DESCRIPTIONS, type GameModeId, type SecretRole } from "@/convex/gameModes"
+import { Trophy, Skull, RotateCcw, Home, RefreshCw, Users } from "lucide-react"
 import Link from "next/link"
 
 interface GameResultsProps {
@@ -21,11 +22,15 @@ export function GameResults({ room, players, currentPlayer, sessionId }: GameRes
   const resetRoom = useMutation(api.rooms.resetRoom)
   const isHost = currentPlayer.isHost
 
+  const gameMode = (room.gameMode || "clasico") as GameModeId
+  const modeConfig = GAME_MODES[gameMode]
+
   // Filter active players (who participated in voting)
   const activePlayers = players.filter((p) => !p.isEliminated || p.votedFor)
 
   // Calcular resultados
   const impostor = players.find((p) => p.sessionId === room.impostorId)
+  const impostor2 = room.impostorId2 ? players.find((p) => p.sessionId === room.impostorId2) : null
   const votes: Record<string, number> = {}
 
   activePlayers.forEach((p) => {
@@ -37,15 +42,17 @@ export function GameResults({ room, players, currentPlayer, sessionId }: GameRes
   // Encontrar el más votado
   let maxVotes = 0
   let mostVoted: string | null = null
-  Object.entries(votes).forEach(([sessionId, count]) => {
+  Object.entries(votes).forEach(([sid, count]) => {
     if (count > maxVotes) {
       maxVotes = count
-      mostVoted = sessionId
+      mostVoted = sid
     }
   })
 
-  const impostorCaught = mostVoted === room.impostorId
-  const isCurrentPlayerImpostor = sessionId === room.impostorId
+  // Determine win condition based on mode
+  const payasoWon = room.payasoWinner != null
+  const impostorCaught = mostVoted === room.impostorId || mostVoted === room.impostorId2
+  const isCurrentPlayerImpostor = sessionId === room.impostorId || sessionId === room.impostorId2
 
   const handlePlayAgain = async () => {
     try {
@@ -66,23 +73,46 @@ export function GameResults({ room, players, currentPlayer, sessionId }: GameRes
   return (
     <main className="min-h-screen flex flex-col p-4">
       <div className="w-full max-w-2xl mx-auto space-y-6">
+        {/* Mode indicator */}
+        <div className="text-center text-sm text-muted-foreground">
+          {modeConfig.emoji} Modo {modeConfig.name}
+        </div>
+
         {/* Resultado principal */}
         <Card
           className={`border-2 ${
-            impostorCaught ? "bg-primary/10 border-primary" : "bg-destructive/10 border-destructive"
+            payasoWon
+              ? "bg-yellow-500/10 border-yellow-500"
+              : impostorCaught
+                ? "bg-primary/10 border-primary"
+                : "bg-destructive/10 border-destructive"
           }`}
         >
           <CardContent className="pt-8 pb-8 text-center">
-            {impostorCaught ? (
+            {payasoWon ? (
+              <>
+                <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-4xl">🤡</span>
+                </div>
+                <h1 className="text-3xl font-bold text-yellow-500 mb-2">¡El Payaso gana!</h1>
+                <p className="text-muted-foreground">
+                  El Payaso logro que lo votaran y escapo victorioso.
+                </p>
+              </>
+            ) : impostorCaught ? (
               <>
                 <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
                   <Trophy className="w-8 h-8 text-primary" />
                 </div>
-                <h1 className="text-3xl font-bold text-primary mb-2">¡Impostor atrapado!</h1>
+                <h1 className="text-3xl font-bold text-primary mb-2">
+                  {impostor2 ? "¡Impostores atrapados!" : "¡Impostor atrapado!"}
+                </h1>
                 <p className="text-muted-foreground">
                   {isCurrentPlayerImpostor
-                    ? "Te han descubierto... ¡Mejor suerte la próxima!"
-                    : "Han descubierto al impostor. ¡Buen trabajo equipo!"}
+                    ? "Te han descubierto... ¡Mejor suerte la proxima!"
+                    : impostor2
+                      ? "Han descubierto a ambos impostores. ¡Buen trabajo equipo!"
+                      : "Han descubierto al impostor. ¡Buen trabajo equipo!"}
                 </p>
               </>
             ) : (
@@ -90,34 +120,127 @@ export function GameResults({ room, players, currentPlayer, sessionId }: GameRes
                 <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
                   <Skull className="w-8 h-8 text-destructive" />
                 </div>
-                <h1 className="text-3xl font-bold text-destructive mb-2">¡El impostor gana!</h1>
+                <h1 className="text-3xl font-bold text-destructive mb-2">
+                  {impostor2 ? "¡Los impostores ganan!" : "¡El impostor gana!"}
+                </h1>
                 <p className="text-muted-foreground">
                   {isCurrentPlayerImpostor
-                    ? "¡Nadie te descubrió! Eres un maestro del engaño."
-                    : "El impostor ha escapado sin ser detectado."}
+                    ? "¡Nadie te descubrio! Eres un maestro del engano."
+                    : impostor2
+                      ? "Los impostores han escapado sin ser detectados."
+                      : "El impostor ha escapado sin ser detectado."}
                 </p>
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* Revelación del impostor */}
+        {/* Revelación del impostor(es) */}
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">El impostor era...</CardTitle>
+            <CardTitle className="text-lg">
+              {impostor2 ? "Los impostores eran..." : "El impostor era..."}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="flex items-center gap-4 p-4 rounded-lg bg-destructive/10 border border-destructive">
               <div className="w-14 h-14 rounded-full bg-destructive flex items-center justify-center text-2xl font-bold text-destructive-foreground">
                 {impostor?.name.charAt(0).toUpperCase()}
               </div>
               <div>
                 <p className="text-xl font-bold">{impostor?.name}</p>
-                <p className="text-sm text-muted-foreground">Recibió {votes[room.impostorId!] || 0} voto(s)</p>
+                <p className="text-sm text-muted-foreground">Recibio {votes[room.impostorId!] || 0} voto(s)</p>
               </div>
             </div>
+            {impostor2 && (
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-destructive/10 border border-destructive">
+                <div className="w-14 h-14 rounded-full bg-destructive flex items-center justify-center text-2xl font-bold text-destructive-foreground">
+                  {impostor2.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-xl font-bold">{impostor2.name}</p>
+                  <p className="text-sm text-muted-foreground">Recibio {votes[room.impostorId2!] || 0} voto(s)</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Roles Secretos reveal */}
+        {gameMode === "roles_secretos" && (
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Roles secretos revelados</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-2">
+                {players.map((p) => {
+                  const role = p.secretRole as SecretRole | undefined
+                  if (!role || role === "none") return null
+                  const roleInfo = ROLE_DESCRIPTIONS[role]
+                  return (
+                    <div
+                      key={p._id}
+                      className="flex items-center gap-2 p-2 rounded-lg bg-secondary/50"
+                    >
+                      <span className="text-lg">{roleInfo.emoji}</span>
+                      <div>
+                        <p className="text-sm font-medium">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{roleInfo.name}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Team results for team_vs_team */}
+        {gameMode === "team_vs_team" && room.teamAssignments && (
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Equipos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                  <p className="font-medium text-blue-400 mb-2">Equipo A</p>
+                  <div className="space-y-1">
+                    {room.teamAssignments.teamA.map((sid) => {
+                      const p = players.find((pl) => pl.sessionId === sid)
+                      const isTeamImpostor = sid === room.teamAssignments!.teamAImpostor
+                      return (
+                        <div key={sid} className="flex items-center justify-between text-sm">
+                          <span>{p?.name}</span>
+                          {isTeamImpostor && <span className="text-destructive text-xs">Impostor</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                  <p className="font-medium text-red-400 mb-2">Equipo B</p>
+                  <div className="space-y-1">
+                    {room.teamAssignments.teamB.map((sid) => {
+                      const p = players.find((pl) => pl.sessionId === sid)
+                      const isTeamImpostor = sid === room.teamAssignments!.teamBImpostor
+                      return (
+                        <div key={sid} className="flex items-center justify-between text-sm">
+                          <span>{p?.name}</span>
+                          {isTeamImpostor && <span className="text-destructive text-xs">Impostor</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Palabra secreta */}
         <Card className="bg-card border-border">

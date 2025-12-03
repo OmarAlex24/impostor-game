@@ -9,8 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { WordReveal } from "@/components/word-reveal"
 import { PlayerList } from "@/components/player-list"
 import { SpectatorChat } from "@/components/spectator-chat"
+import { EmojiPanel } from "@/components/emoji-panel"
+import { RoleActions, GhostClueDisplay } from "@/components/role-actions"
+import { TeamDisplay } from "@/components/team-display"
+import { CombatView } from "@/components/combat-view"
+import { GAME_MODES, type GameModeId } from "@/convex/gameModes"
 import { playTurnSound } from "@/lib/sounds"
-import { MessageCircle, Vote, ArrowRight, Loader2, Ghost, Clock, Users } from "lucide-react"
+import { MessageCircle, Vote, ArrowRight, Loader2, Ghost, Clock, Users, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface GameBoardProps {
@@ -32,10 +37,17 @@ export function GameBoard({ room, players, currentPlayer, sessionId }: GameBoard
   const autoPassTurn = useMutation(api.rooms.autoPassTurn)
   const callToVote = useMutation(api.rooms.callToVote)
 
-  const isImpostor = room.impostorId === sessionId
+  const gameMode = (room.gameMode || "clasico") as GameModeId
+  const modeConfig = GAME_MODES[gameMode]
+  const isImpostor = room.impostorId === sessionId || room.impostorId2 === sessionId
   const isHost = currentPlayer.isHost
   const isEliminated = currentPlayer.isEliminated
   const word = isImpostor ? null : room.currentWord
+  const isSilencioMode = gameMode === "silencio"
+  const isRolesSecretosMode = gameMode === "roles_secretos"
+  const isTeamMode = gameMode === "team_vs_team"
+  const isCombateMode = gameMode === "combate"
+  const isDobleAgenteMode = gameMode === "doble_agente"
 
   // Filter active players (non-eliminated)
   const activePlayers = players.filter((p) => !p.isEliminated)
@@ -241,7 +253,7 @@ export function GameBoard({ room, players, currentPlayer, sessionId }: GameBoard
               Fase de discusión
             </h1>
             <p className="text-muted-foreground text-sm">
-              Categoría: {room.category} • Ronda {roundNumber}/{totalRounds}
+              {modeConfig.emoji} {modeConfig.name} • {room.category} • Ronda {roundNumber}/{totalRounds}
             </p>
           </div>
           <div className="text-right">
@@ -251,6 +263,30 @@ export function GameBoard({ room, players, currentPlayer, sessionId }: GameBoard
             </div>
           </div>
         </div>
+
+        {/* Team Display for team_vs_team mode */}
+        {isTeamMode && (
+          <TeamDisplay room={room} players={players} currentSessionId={sessionId} />
+        )}
+
+        {/* Combat View for combate mode */}
+        {isCombateMode && room.combatants && (
+          <CombatView room={room} players={players} currentSessionId={sessionId} />
+        )}
+
+        {/* Doble Agente warning for impostors */}
+        {isDobleAgenteMode && isImpostor && (
+          <Card className="bg-yellow-500/10 border-yellow-500/30">
+            <CardContent className="py-3">
+              <div className="flex items-center gap-2 text-yellow-400">
+                <AlertTriangle className="w-5 h-5" />
+                <p className="text-sm">
+                  Hay otro impostor, pero no sabes quien es. Cuidado de no delatarte mutuamente.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Turn indicator banner with timer */}
         {currentTurnPlayer && (
@@ -344,6 +380,24 @@ export function GameBoard({ room, players, currentPlayer, sessionId }: GameBoard
             )}
           </CardContent>
         </Card>
+
+        {/* Emoji Panel for Silencio mode */}
+        {isSilencioMode && (
+          <EmojiPanel roomId={room._id} sessionId={sessionId} disabled={false} />
+        )}
+
+        {/* Role Actions for Roles Secretos mode */}
+        {isRolesSecretosMode && (
+          <>
+            <RoleActions
+              room={room}
+              currentPlayer={currentPlayer}
+              players={players}
+              sessionId={sessionId}
+            />
+            <GhostClueDisplay players={players} />
+          </>
+        )}
 
         {/* Player list */}
         <Card className="bg-card border-border">

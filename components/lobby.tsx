@@ -5,12 +5,14 @@ import { useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
 import { wordCategories } from "@/convex/words"
+import { GAME_MODES, type GameModeId } from "@/convex/gameModes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PlayerList } from "@/components/player-list"
 import { ShareRoom } from "@/components/share-room"
+import { GameModeSelector } from "@/components/game-mode-selector"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +33,7 @@ interface LobbyProps {
 }
 
 export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
+  const [gameMode, setGameMode] = useState<GameModeId>("clasico")
   const [category, setCategory] = useState<string>("Animales")
   const [discussionMinutes, setDiscussionMinutes] = useState<number>(2)
   const [isStarting, setIsStarting] = useState(false)
@@ -45,7 +48,8 @@ export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
 
   const isHost = currentPlayer.isHost
   const allReady = players.every((p) => p.isReady || p.isHost)
-  const canStart = players.length >= 3 && allReady
+  const modeConfig = GAME_MODES[gameMode]
+  const canStart = players.length >= modeConfig.minPlayers && allReady
 
   const handleKickRequest = (playerId: Id<"players">, playerName: string) => {
     setKickTarget({ id: playerId, name: playerName })
@@ -83,6 +87,7 @@ export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
         sessionId,
         category,
         discussionMinutes,
+        gameMode,
       })
     } catch (err: any) {
       setError(err.message || "Error al iniciar")
@@ -107,8 +112,10 @@ export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center justify-between">
               <span>Jugadores ({players.length})</span>
-              {players.length < 3 && (
-                <span className="text-sm font-normal text-muted-foreground">Mínimo 3 jugadores</span>
+              {players.length < modeConfig.minPlayers && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  Min {modeConfig.minPlayers} para {modeConfig.name}
+                </span>
               )}
             </CardTitle>
           </CardHeader>
@@ -133,6 +140,16 @@ export function Lobby({ room, players, currentPlayer, sessionId }: LobbyProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Game Mode Selector */}
+              <div className="space-y-2">
+                <Label>Modo de Juego</Label>
+                <GameModeSelector
+                  selectedMode={gameMode}
+                  onSelectMode={setGameMode}
+                  playerCount={players.length}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Categoría</Label>
